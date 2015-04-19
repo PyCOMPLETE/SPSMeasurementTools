@@ -13,3 +13,6 @@ def date_strings_interval(start_tstamp_unix, end_tstamp_unix):
 	for t_day in np.arange(unixstamp_of_midnight_before(start_tstamp_unix), end_tstamp_unix+1., 24*3600.):
 		list_date_strings.append(unixstamp2datestring(t_day))
 	return list_date_strings
+
+def localtime2unixstamp(local_time_str):
+	return time.mktime(time.strptime(local_time_str, '%Y_%m_%d %H:%M'))	

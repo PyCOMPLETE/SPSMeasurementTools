@@ -8,6 +8,7 @@ import time
 import glob
 import pickle
 from zip_mat import save_zip
+import timestamp_helpers as th
 
 
 class BCT:
@@ -21,7 +22,7 @@ class BCT:
 		intens_exponent = np.float_(np.squeeze(dict_bct['totalIntensity_unitExponent']))
 
 		self.total_intensity = np.squeeze(dict_bct['totalIntensity'])*10**(intens_exponent)
-		self.SPS_user = str(np.squeeze(dict_bct['SPSuser']))
+		self.SPSuser = str(np.squeeze(dict_bct['SPSuser']))
 		self.SC_numb = np.int_(np.squeeze(dict_bct['superCycleNb']))
 
 		time_start_cycle_string = dict_bct['cycleTime']
@@ -68,45 +69,47 @@ def make_pickle(pickle_name='bct_overview.pkl', outp_folder='bct/', t_obs_1st_in
 	if os.path.isfile(pickle_name):
 		with open(pickle_name) as fid:
 			beams = pickle.load(fid)
+			print '\nUpdating file: %s'%pickle_name
 	else:
 		beams = {}
+		print '\nCreating file: %s'%pickle_name
 
-	SPS_user_list = os.listdir(outp_folder)
-	for SPS_user in SPS_user_list:
+	SPSuser_list = os.listdir(outp_folder)
+	for SPSuser in SPSuser_list:
 
-		if not(SPS_user in beams.keys()):
-			beams[SPS_user] = {}
-			beams[SPS_user]['bct_max_vect'] = np.array([])
-			beams[SPS_user]['SC_numb_vect'] = np.array([])
-			beams[SPS_user]['timestamp_float'] = np.array([])
-			beams[SPS_user]['bct_integrated'] = np.array([])
-			beams[SPS_user]['bct_1st_inj'] = np.array([])
+		if not(SPSuser in beams.keys()):
+			beams[SPSuser] = {}
+			beams[SPSuser]['bct_max_vect'] = np.array([])
+			beams[SPSuser]['SC_numb_vect'] = np.array([])
+			beams[SPSuser]['timestamp_float'] = np.array([])
+			beams[SPSuser]['bct_integrated'] = np.array([])
+			beams[SPSuser]['bct_1st_inj'] = np.array([])
 
-		list_bct_files = os.listdir(bct_mat_folder +'/'+ SPS_user)
+		list_bct_files = os.listdir(outp_folder +'/'+ SPSuser)
 		N_cycles = len(list_bct_files)
 		for ii in xrange(N_cycles):
 			filename_bct = list_bct_files[ii]
-			tstamp_mat_filename = float(filename_bct.split('_')[-2])
+			tstamp_mat_filename = float((filename_bct.split('_')[-1]).split('.mat')[0])
 
-			if tstamp_mat_filename in beams[SPS_user]['timestamp_float']:
+			if tstamp_mat_filename in beams[SPSuser]['timestamp_float']:
 				continue
 			try:
-				print '%s %d/%d'%(SPS_user, ii, N_cycles - 1)
-				curr_bct = BCT(bct_mat_folder +'/'+ SPS_user +'/'+ filename_bct)
-				SPS_user = curr_bct.SPS_user
+				print '%s %d/%d'%(SPSuser, ii, N_cycles - 1)
+				curr_bct = BCT(outp_folder +'/'+ SPSuser +'/'+ filename_bct)
+				SPSuser = curr_bct.SPSuser
 
-				beams[SPS_user]['bct_max_vect'] = np.append(beams[SPS_user]['bct_max_vect'], curr_bct.max_inten())
-				beams[SPS_user]['SC_numb_vect'] = np.append(beams[SPS_user]['SC_numb_vect'], curr_bct.SC_numb)
-				beams[SPS_user]['timestamp_float'] = np.append(beams[SPS_user]['timestamp_float'], curr_bct.time_start_cycle_float)
-				beams[SPS_user]['bct_integrated'] = np.append(beams[SPS_user]['bct_integrated'], curr_bct.integral())
-				beams[SPS_user]['bct_1st_inj'] = np.append(beams[SPS_user]['bct_1st_inj'], curr_bct.nearest_sample(t_obs_1st_inj))
+				beams[SPSuser]['bct_max_vect'] = np.append(beams[SPSuser]['bct_max_vect'], curr_bct.max_inten())
+				beams[SPSuser]['SC_numb_vect'] = np.append(beams[SPSuser]['SC_numb_vect'], curr_bct.SC_numb)
+				beams[SPSuser]['timestamp_float'] = np.append(beams[SPSuser]['timestamp_float'], curr_bct.time_start_cycle_float)
+				beams[SPSuser]['bct_integrated'] = np.append(beams[SPSuser]['bct_integrated'], curr_bct.integral())
+				beams[SPSuser]['bct_1st_inj'] = np.append(beams[SPSuser]['bct_1st_inj'], curr_bct.nearest_sample(t_obs_1st_inj))
 			except IOError as err:
 				print err
 
-	for SPS_user in beams.keys():
-		ind_sorted = np.argsort(beams[SPS_user]['timestamp_float'])
-		for kk in beams[SPS_user].keys():
-			beams[SPS_user][kk] = np.take(beams[SPS_user][kk], ind_sorted)
+	for SPSuser in beams.keys():
+		ind_sorted = np.argsort(beams[SPSuser]['timestamp_float'])
+		for kk in beams[SPSuser].keys():
+			beams[SPSuser][kk] = np.take(beams[SPSuser][kk], ind_sorted)
 
 	with open(pickle_name, 'w') as fid:
 		pickle.dump(beams, fid)
@@ -125,24 +128,24 @@ def sdds_to_dict(in_complete_path):
 	cycleTime = data['cycleTime'].tostring()
 	t_stamp_unix = time.mktime(time.strptime(cycleTime.replace('"', '').replace('\n','').split('.')[0], '%Y/%m/%d %H:%M:%S'))
 
-	beamID=np.int_(data['beamID'])
-	deviceName=data['deviceName'].tostring()
-	sbfIntensity=np.float_(data['sbfIntensity'])
-	acqState=np.int_(data['acqState'])
-	totalIntensity=data['totalIntensity']
-	acqTime=data['acqTime'].tostring()
-	propType=np.int_(data['propType'])
-	totalIntensity_unitExponent=np.int_(data['totalIntensity_unitExponent'])
-	measStamp_unitExponent=np.float_(data['measStamp_unitExponent'])
-	samplingTime=np.int_(data['samplingTime'])
-	measStamp_unit=np.int_(data['measStamp_unit'])
-	observables=np.int_(data['observables'])
-	nbOfMeas=np.int_(data['nbOfMeas'])
-	superCycleNb=np.int_(data['superCycleNb'])
-	acqMsg=data['acqMsg'].tostring()
-	measStamp=data['measStamp']
-	acqDesc=data['acqDesc'].tostring()
-	totalIntensity_unit=np.int_(data['totalIntensity_unit'])
+	beamID = np.int_(data['beamID'])
+	deviceName = ((data['deviceName'].tostring()).split('\n')[0]).split('SPS.')[-1]
+	sbfIntensity = np.float_(data['sbfIntensity'])
+	acqState = np.int_(data['acqState'])
+	totalIntensity = data['totalIntensity']
+	acqTime = data['acqTime'].tostring()
+	propType = np.int_(data['propType'])
+	totalIntensity_unitExponent = np.int_(data['totalIntensity_unitExponent'])
+	measStamp_unitExponent = np.float_(data['measStamp_unitExponent'])
+	samplingTime = np.int_(data['samplingTime'])
+	measStamp_unit = np.int_(data['measStamp_unit'])
+	observables = np.int_(data['observables'])
+	nbOfMeas = np.int_(data['nbOfMeas'])
+	superCycleNb = np.int_(data['superCycleNb'])
+	acqMsg = data['acqMsg'].tostring()
+	measStamp = data['measStamp']
+	acqDesc = data['acqDesc'].tostring()
+	totalIntensity_unit = np.int_(data['totalIntensity_unit'])
 
 	dict_meas = {
 		'beamID':beamID,
@@ -171,13 +174,14 @@ def sdds_to_dict(in_complete_path):
 	return dict_meas
 
 
-def sdds_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='bct/', suffix_file='bct'):
+def sdds_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='bct/'):
 
 	dict_meas = sdds_to_dict(in_complete_path)
 	us_string = dict_meas['SPSuser']
 	t_stamp_unix = dict_meas['t_stamp_unix']
+	device_name = dict_meas['deviceName']
 
-	out_filename = mat_filename_prefix + us_string + ('_%d_'%t_stamp_unix) + suffix_file
+	out_filename = mat_filename_prefix + us_string +'_'+  device_name + ('_%d'%t_stamp_unix)
 	out_complete_path = outp_folder + us_string +'/'+ out_filename
 
 	if not os.path.isdir(outp_folder + us_string):
@@ -186,3 +190,63 @@ def sdds_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='
 
 	sio.savemat(out_complete_path, dict_meas, oned_as='row')
 	save_zip(out_complete_path)
+
+
+def make_mat_files(start_time, end_time='Now', data_folder='/user/slops/data/SPS_DATA/OP_DATA/SPS_BCT/',
+		   device_name=None, SPSuser=None, filename_converted='bct_converted.txt'):
+
+	if type(start_time) is str:
+		start_tstamp_unix = th.localtime2unixstamp(start_time)
+	if end_time == 'Now':
+		end_tstamp_unix = time.mktime(time.localtime())
+	elif type(end_time) is str:
+		end_tstamp_unix = th.localtime2unixstamp(end_time)
+
+	try:
+		with open(filename_converted, 'r') as fid:
+			list_converted = fid.read().split('\n')
+	except IOError:
+		list_converted = []
+
+	list_date_strings = th.date_strings_interval(start_tstamp_unix, end_tstamp_unix)
+
+	sdds_folder_list = []
+	for date_string in list_date_strings:
+		if device_name == None:
+			sdds_folder_list.extend(glob.glob(data_folder + date_string + '/SPS.BCTDC.*@Acquisition/'))
+		else:
+			device_path = glob.glob(data_folder + date_string + '/SPS.BCTDC.%s*@Acquisition/'%device_name)
+			if len(device_path) == 0:
+				print 'No data for device %s on %s'%(device_name, date_string)
+			else:
+				sdds_folder_list.extend(device_path)
+
+
+	for sdds_folder in sdds_folder_list:
+		print '\nSaving data in folder: %s\n'%sdds_folder
+		file_list = os.listdir(sdds_folder)
+		for filename in file_list:
+			tstamp_filename = int(float(filename.split('@')[-2]) / 1e9)
+			if not(tstamp_filename > start_tstamp_unix and tstamp_filename < end_tstamp_unix):
+				continue
+
+			if SPSuser != None:
+				user_filename = filename.split('.')[-2]
+				if user_filename != SPSuser:
+					continue
+
+			if filename in list_converted:
+				continue
+
+			try:
+				complete_path = sdds_folder + filename
+				print complete_path
+
+				sdds_to_file(complete_path)
+				with open(filename_converted, 'a+') as fid:
+					fid.write(filename+'\n')
+			except KeyError:#Exception as err:
+				print 'Skipped:'
+				print complete_path
+				print 'Got exception:'
+				print err
