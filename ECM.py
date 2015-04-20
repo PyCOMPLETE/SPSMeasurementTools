@@ -52,27 +52,26 @@ class ECLDMON:
             self.ecld_mat = ecld_mon_rescaled[:,48:96]
             self.gain3 = TOTAL_GAIN[3:6]
 
-	def total_vs_channel(self):
-		return np.sum(self.ecld_mat,0)
+    def total_vs_channel(self):
+        return np.sum(self.ecld_mat,0)
 
-	def total_vs_time(self):
-		return np.sum(self.ecld_mat,1)
+    def total_vs_time(self):
+        return np.sum(self.ecld_mat,1)
 
-	def profile(self, t_obs):
-		ind_min = np.argmin(np.abs(self.time_vect-t_obs))
-		return self.ecld_mat[ind_min,:]
+    def profile(self, t_obs):
+        ind_min = np.argmin(np.abs(self.time_vect-t_obs))
+        return self.ecld_mat[ind_min,:]
 
-	def total_at_time(self, t_obs, chann_list=None):
-		temp = self.profile(t_obs)
-		if chann_list == None:
-			return np.sum(temp)
-		else:
-			return np.sum(np.take(temp, chann_list))
+    def total_at_time(self, t_obs, chann_list=None):
+        temp = self.profile(t_obs)
+        if chann_list == None:
+            return np.sum(temp)
+        else:
+            return np.sum(np.take(temp, chann_list))
 
 
 def sdds_to_dict(in_complete_path):
 	
-
     try:
 	    temp = sddsdata(in_complete_path, endian='little', full=True)
     except IndexError:
@@ -217,7 +216,10 @@ def make_pickle(start_from_last=True, pickle_name_ecm='ecm_overview.pkl', pickle
             if SPSuser in SPSuser_blacklist:
                continue
 
-            t_stamps_ecm = np.array(semcloud_lists[ecm_device][SPSuser])       
+            t_stamps_ecm = np.array(semcloud_lists[ecm_device][SPSuser])
+            if len(t_stamps_ecm) == 0:
+                print 'No ECM data for user: %s'%SPSuser
+                continue
 
             if not(SPSuser in beams_ecm.keys()):
                 beams_ecm[SPSuser] = {}
