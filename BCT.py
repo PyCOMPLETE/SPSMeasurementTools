@@ -245,7 +245,7 @@ def make_mat_files(start_time, end_time='Now', data_folder='/user/slops/data/SPS
 				sdds_to_file(complete_path)
 				with open(filename_converted, 'a+') as fid:
 					fid.write(filename+'\n')
-			except KeyError:#Exception as err:
+			except Exception as err:
 				print 'Skipped:'
 				print complete_path
 				print 'Got exception:'
