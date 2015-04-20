@@ -64,7 +64,7 @@ class BCT:
 			return 0., 0.
 
 
-def make_pickle(pickle_name='bct_overview.pkl', outp_folder='bct/', t_obs_1st_inj=1.5):
+def make_pickle(pickle_name='bct_overview.pkl', mat_folder='bct/', t_obs_1st_inj=1.5):
 
 	if os.path.isfile(pickle_name):
 		with open(pickle_name) as fid:
@@ -74,7 +74,7 @@ def make_pickle(pickle_name='bct_overview.pkl', outp_folder='bct/', t_obs_1st_in
 		beams = {}
 		print '\nCreating file: %s'%pickle_name
 
-	SPSuser_list = os.listdir(outp_folder)
+	SPSuser_list = os.listdir(mat_folder)
 	for SPSuser in SPSuser_list:
 
 		if not(SPSuser in beams.keys()):
@@ -85,7 +85,7 @@ def make_pickle(pickle_name='bct_overview.pkl', outp_folder='bct/', t_obs_1st_in
 			beams[SPSuser]['bct_integrated'] = np.array([])
 			beams[SPSuser]['bct_1st_inj'] = np.array([])
 
-		list_bct_files = os.listdir(outp_folder +'/'+ SPSuser)
+		list_bct_files = os.listdir(mat_folder +'/'+ SPSuser)
 		N_cycles = len(list_bct_files)
 		for ii in xrange(N_cycles):
 			filename_bct = list_bct_files[ii]
@@ -95,7 +95,7 @@ def make_pickle(pickle_name='bct_overview.pkl', outp_folder='bct/', t_obs_1st_in
 				continue
 			try:
 				print '%s %d/%d'%(SPSuser, ii, N_cycles - 1)
-				curr_bct = BCT(outp_folder +'/'+ SPSuser +'/'+ filename_bct)
+				curr_bct = BCT(mat_folder +'/'+ SPSuser +'/'+ filename_bct)
 				SPSuser = curr_bct.SPSuser
 
 				beams[SPSuser]['bct_max_vect'] = np.append(beams[SPSuser]['bct_max_vect'], curr_bct.max_inten())
@@ -223,7 +223,7 @@ def make_mat_files(start_time, end_time='Now', data_folder='/user/slops/data/SPS
 
 
 	for sdds_folder in sdds_folder_list:
-		print '\nSaving data in folder: %s\n'%sdds_folder
+		print '\nConverting data in folder: %s\n'%sdds_folder
 		file_list = os.listdir(sdds_folder)
 		for filename in file_list:
 			tstamp_filename = int(float(filename.split('@')[-2]) / 1e9)
