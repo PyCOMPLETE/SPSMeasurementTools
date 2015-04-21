@@ -84,6 +84,7 @@ def make_pickle(pickle_name='bct_overview.pkl', mat_folder='bct/', t_obs_1st_inj
 			beams[SPSuser]['timestamp_float'] = np.array([])
 			beams[SPSuser]['bct_integrated'] = np.array([])
 			beams[SPSuser]['bct_1st_inj'] = np.array([])
+			beams[SPSuser]['acqusition_time_length'] = np.array([])
 
 		list_bct_files = os.listdir(mat_folder +'/'+ SPSuser)
 		N_cycles = len(list_bct_files)
@@ -103,16 +104,17 @@ def make_pickle(pickle_name='bct_overview.pkl', mat_folder='bct/', t_obs_1st_inj
 				beams[SPSuser]['timestamp_float'] = np.append(beams[SPSuser]['timestamp_float'], curr_bct.time_start_cycle_float)
 				beams[SPSuser]['bct_integrated'] = np.append(beams[SPSuser]['bct_integrated'], curr_bct.integral())
 				beams[SPSuser]['bct_1st_inj'] = np.append(beams[SPSuser]['bct_1st_inj'], curr_bct.nearest_sample(t_obs_1st_inj))
+				beams[SPSuser]['acqusition_time_length'] = np.append(beams[SPSuser]['acqusition_time_length'], np.max(curr_bct.time_vect))
+
 			except IOError as err:
 				print err
 
-	for SPSuser in beams.keys():
 		ind_sorted = np.argsort(beams[SPSuser]['timestamp_float'])
 		for kk in beams[SPSuser].keys():
 			beams[SPSuser][kk] = np.take(beams[SPSuser][kk], ind_sorted)
 
-	with open(pickle_name, 'w') as fid:
-		pickle.dump(beams, fid)
+		with open(pickle_name, 'w') as fid:
+			pickle.dump(beams, fid)
 
 
 def sdds_to_dict(in_complete_path):
@@ -197,10 +199,15 @@ def make_mat_files(start_time, end_time='Now', data_folder='/user/slops/data/SPS
 
 	if type(start_time) is str:
 		start_tstamp_unix = th.localtime2unixstamp(start_time)
+	else:
+		start_tstamp_unix = start_time
+
 	if end_time == 'Now':
 		end_tstamp_unix = time.mktime(time.localtime())
 	elif type(end_time) is str:
 		end_tstamp_unix = th.localtime2unixstamp(end_time)
+	else:
+		end_tstamp_unix = end_time
 
 	try:
 		with open(filename_converted, 'r') as fid:
