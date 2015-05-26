@@ -13,13 +13,92 @@ import shutil
 import gzip
 import pickle
 
+class WireScanCollection(object):
+    def __init__(self, list_WS_obj, acq_time_in_cycle_ref, gain_ref):
+        self._fitfunc = lambda p, x: p[0] + p[1]*np.exp(-((x-p[2])**2) / (2*p[3]**2)) + p[4]*x
+        self._errfunc = lambda p, x, y: self._fitfunc(p, x) - y
+
+        self.list_WS_obj = list_WS_obj
+
+        # Apply filters.
+        self.acq_time_in_cycle_ref = acq_time_in_cycle_ref
+        self.gain_ref = gain_ref
+        self.filter_ws_list()
+
+    def filter_ws_list(self):
+        list_WS_obj_new = []
+        for ws in self.list_WS_obj:
+            if abs(ws.acq_time_in_cycle_set_in - self.acq_time_in_cycle_ref) > 20: # [ms]
+                print 'acq time does not match, diff', abs(ws.acq_time_in_cycle_set_in - self.acq_time_in_cycle_ref)
+                continue
+            if abs(ws.gain - self.gain_ref) > 2: #[a.u.]
+                print 'gain does not match, diff', abs(ws.gain - self.gain_ref)
+                continue
+            list_WS_obj_new.append(ws)
+        self.list_WS_obj = list_WS_obj_new
+
+    def make_combined_fit(self):
+        nPoints = [ len(ws.proj_profile_set_in) for ws in self.list_WS_obj ]
+        array_prof = np.zeros((len(self.list_WS_obj), max(nPoints)))
+        array_pos = np.zeros((len(self.list_WS_obj), max(nPoints)))
+
+        for i, ws in enumerate(self.list_WS_obj):
+            temp_prof = ws.proj_profile_set_in.copy()
+            temp_pos = ws.proj_position_set_in.copy()
+            temp_prof -= ws.p1_in[0][0] # Correct for baseline.
+            temp_pos -= ws.p1_in[0][2] # Correct for mean value.
+            #temp_prof /= ws.p1_in[0][1] # Normalise amplitude.
+            array_prof[i,:nPoints[i]] = temp_prof
+            array_pos[i,:nPoints[i]] = temp_pos
+        
+        self.array_prof = array_prof[:,:min(nPoints)].flatten()
+        self.array_pos = array_pos[:,:min(nPoints)].flatten()
+        
+        self.p0, self.p1 = self._make_fit(self.array_pos, self.array_prof)
+        
+    def get_fitted_profile(self):
+        eval_pos = np.linspace(min(self.array_pos), max(self.array_pos), 1000)
+        return eval_pos, self._fitfunc(self.p1, eval_pos)
+        
+    def get_emittances(self):
+
+        beta_opt = self.list_WS_obj[0].beta_opt
+        betagamma_in = self.list_WS_obj[0].betagamma_in
+        phys_emit = (self.p1[3]*1e-6)**2 / beta_opt
+        norm_emit = betagamma_in * phys_emit
+
+        return norm_emit, phys_emit
+    
+    def _make_fit(self, x, y, N_points_ma=50):
+
+        indx_max = np.argmax(y)
+        mu0 = x[indx_max]
+        window = 2*N_points_ma
+        x_tmp = x[indx_max-window:indx_max+window]
+        y_tmp = y[indx_max-window:indx_max+window]
+        offs0 = min(y_tmp)
+        ampl = max(y_tmp)-offs0
+        x1 = x_tmp[np.searchsorted(y_tmp[:window], offs0+ampl/2)]
+        x2 = x_tmp[np.searchsorted(-y_tmp[window:], -offs0+ampl/2)]
+        FWHM = x2-x1
+        sigma0 = FWHM/2.355
+
+        p0 = [offs0,  ampl, mu0, sigma0, 0.]
+        p1, success = op.leastsq(self._errfunc, p0[:], args=(x,y))
+        
+        return p0, p1
+        
+
 class WireScan(object):
 
-    def __init__(self, complete_path, init_with_fits=True, optics=None, cycle_type=None,
+    def __init__(self, complete_path, init_with_fits=True, optics=None, cycle_csv_filepath=None,
                  scans_in=True, scans_out=False):
 
         self._fitfunc = lambda p, x: p[0] + p[1]*np.exp(-((x-p[2])**2) / (2*p[3]**2)) + p[4]*x
         self._errfunc = lambda p, x, y: self._fitfunc(p, x) - y
+        
+        self.optics = optics
+        self.cycle_csv_filepath = cycle_csv_filepath
 
         self.scans_in = scans_in
         self.scans_out = scans_out
@@ -33,7 +112,7 @@ class WireScan(object):
 
         self.bunch_selection = np.squeeze(dict_ws['bunchSelection'])
         self.bunch_list = self._bunchSelection2bunchList()
-        self.bunch_list_timber = np.squeeze(dict_ws['bunchListTimber'])
+        #self.bunch_list_timber = np.squeeze(dict_ws['bunchListTimber'])
         self.device_name = str(dict_ws['device_name'][0])
         self.gain = np.float_(np.squeeze(dict_ws['gain']))
         self.t_stamp_unix = np.float_(np.squeeze(dict_ws['t_stamp_unix']))
@@ -41,9 +120,13 @@ class WireScan(object):
         self.acq_time = str(dict_ws['acqTime'][0])
         self.acq_delay = np.float_(np.squeeze(dict_ws['acqDelay']))
         self.acq_type = np.int_(np.squeeze(dict_ws['acqType']))
+        #self.beta_fct = np.squeeze(dict_ws['beta'])
+        #self.energy_in = np.squeeze(dict_ws['energy1'])
+        #self.energy_out = np.squeeze(dict_ws['energy2'])
+
         if self.acq_type == 1:
             self.n_bunches = 1
-            self.bunch_list_timber = np.array([0])
+            #self.bunch_list_timber = np.array([0])
         else:
             self.n_bunches = np.int_(np.squeeze(dict_ws['nbBunches']))
 
@@ -80,8 +163,11 @@ class WireScan(object):
         if init_with_fits:
             self.compute_fits(self.scans_in, self.scans_out)
 
-        if (optics is not None) and (cycle_type is not None):
-                self.compute_emittances(optics, cycle_type)
+        if (self.optics is not None) and (self.cycle_csv_filepath is not None):
+                self.beta_opt = beta_opt_lib[self.device_name +':'+ self.optics]
+                self.betagamma_in = retrieve_betagamma(self.cycle_csv_filepath, self.acq_time_in_cycle_set_in)
+                self.betagamma_out = retrieve_betagamma(self.cycle_csv_filepath, self.acq_time_in_cycle_set_out)
+                self.compute_emittances()
 
     def get_fitted_profile_in(self, bunch_index=0):
         return self._fitfunc(self.p1_in[bunch_index], self.proj_position_set_in)
@@ -158,25 +244,21 @@ class WireScan(object):
                 self.sigma_out[i] = abs(self.p1_out[i][3]*1e-6)
                 self.area_out[i] = abs(self.p1_out[i][1]*self.p1_out[i][3])
 
-    def compute_emittances(self, optics, cycle_type):
-
-        beta_opt = beta_opt_lib[self.device_name +':'+ optics]
+    def compute_emittances(self):
 
         if self.scans_in:
             if self.p1_in == None:
                 self.compute_fits(self.scans_in, False)
-            beta_gamma_in = retrieve_betagamma(cycle_type, self.acq_time_in_cycle_set_in)
-            self.phys_emit_in = np.array(self.sigma_in)**2/beta_opt
-            self.norm_emit_in = beta_gamma_in*self.phys_emit_in
+            self.phys_emit_in = np.array(self.sigma_in)**2/self.beta_opt
+            self.norm_emit_in = self.betagamma_in*self.phys_emit_in
             self.phys_emit_in[np.array(self.sigma_in)==0] = 0.
             self.norm_emit_in[np.array(self.sigma_in)==0] = 0.
 
         if self.scans_out:
             if self.p1_out == None:
                 self.compute_fits(False, self.scans_out)
-            beta_gamma_out = retrieve_betagamma(cycle_type, self.acq_time_in_cycle_set_out)
-            self.phys_emit_out = np.array(self.sigma_out)**2/beta_opt
-            self.norm_emit_out = beta_gamma_out*self.phys_emit_out
+            self.phys_emit_out = np.array(self.sigma_out)**2/self.beta_opt
+            self.norm_emit_out = self.betagamma_out*self.phys_emit_out
             self.phys_emit_out[np.array(self.sigma_out)==0] = 0.
             self.norm_emit_out[np.array(self.sigma_out)==0] = 0.
 
@@ -218,6 +300,7 @@ def timber_to_csv(start_time, end_time='Now', filename_prefix='SPSmeas_', outp_f
         varlist.extend(get_timber_varlist(device_name))
         filename_prefix += device_name.split('.')[-2] + '.' + device_name.split('.')[-1] + '_'
 
+    print 'VARLIST', varlist
     t_queries = np.arange(start_tstamp_unix, end_tstamp_unix, t_query_interval)
     for t_query in t_queries:
         outp_compl_path = outp_folder + '/' + filename_prefix + '%d_%d.csv'%(t_query, t_query_interval)
@@ -278,7 +361,7 @@ def csv_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='w
             acqTimeInCycleSet2 = np.int_(variables[device_name + ':ACQTIMEINCYCLE_OUT'].values[i][0])
             acqType = np.int_(variables[device_name + ':ACQ_TYPE'].values[i][0])
             bunchSelection = np.int_(np.float_(variables[device_name + ':BUNCH_SELECTION'].values[i]))
-            bunchListTimber = np.int_(np.float_(variables[device_name + ':BUNCH_LIST'].values[i]))
+            #bunchListTimber = np.int_(np.float_(variables[device_name + ':BUNCH_LIST'].values[i]))
             gain = np.float_(variables[device_name + ':GAIN'].values[i][0])
             nbAcq = np.int_(variables[device_name + ':NB_ACQ'].values[i][0])
             nbBunches = np.int_(variables[device_name + ':NB_BUNCHES'].values[i][0])
@@ -292,6 +375,12 @@ def csv_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='w
             projDataSet2 = np.float_(variables[device_name + ':PROF_DATA_OUT'].values[i])
             projPositionSet1 = np.float_(variables[device_name + ':PROF_POSITION_IN'].values[i])
             projPositionSet2 = np.float_(variables[device_name + ':PROF_POSITION_OUT'].values[i])
+            #beta = np.float_(variables[device_name + '.APP.IN:BETA'].values[i][0])
+            #energy1 = np.float_(variables[device_name + '.APP.IN:ENERGY'].values[i][0])
+            #try:
+            #    energy2 = np.float_(variables[device_name + '.APP.OUT:ENERGY'].values[i][0])
+            #except IndexError:
+            #    energy2 = 0.
 
             dict_meas = {
                 'acqClockDiv': acqClockDiv,
@@ -301,7 +390,7 @@ def csv_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='w
                 'acqTimeInCycleSet2': acqTimeInCycleSet2,
                 'acqType': acqType,
                 'bunchSelection': bunchSelection,
-                'bunchListTimber': bunchListTimber,
+                #'bunchListTimber': bunchListTimber,
                 'cycleTime': cycleTime,
                 'gain': gain,
                 'nbAcq': nbAcq,
@@ -316,6 +405,9 @@ def csv_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='w
                 'projDataSet2': projDataSet2,
                 'projPositionSet1': projPositionSet1,
                 'projPositionSet2': projPositionSet2,
+                #'energy1': energy1,
+                #'energy2': energy2,
+                #'beta': beta,
                 't_stamp_unix': t_stamp_unix,
                 'device_name': device_name }
 
@@ -365,7 +457,8 @@ def make_mat_files(start_time, end_time='Now', list_device_names=None, csv_data_
 
 
 def make_pickle(start_from_last=True, pickle_name_ws='ws_overview.pkl', pickle_name_bct='bct_overview.pkl',
-                mat_folder='wirescanner', mat_file_prefix='SPSmeas_', inj_delay_to_cycle_start=1015e-3):
+                mat_folder='wirescanner', mat_file_prefix='SPSmeas_', inj_delay_to_cycle_start=1015e-3,
+                cycle_csv_filepath='SPSMeasurementTools/cycle_momenta/MD_SCRUB_26_L26400_Q20_2014_V1.csv'):
 
     if not os.path.isfile(pickle_name_bct):
         raise RuntimeError('Must have BCT pickle.')
@@ -401,7 +494,7 @@ def make_pickle(start_from_last=True, pickle_name_ws='ws_overview.pkl', pickle_n
 
     for ctr, filename in enumerate(list_files):
         print('Processing file %d/%d'%(ctr, n_files))
-        wsobj = WireScan(mat_folder +'/'+ filename, optics='Q20', cycle_type='26GeV_FB',
+        wsobj = WireScan(mat_folder +'/'+ filename, optics='Q20', cycle_csv_filepath=cycle_csv_filepath,
                          scans_in=True, scans_out=True)
         t_stamp = th.localtime2unixstamp(wsobj.acq_time.split('.')[0], strformat='%Y/%m/%d %H:%M:%S')
 
@@ -446,14 +539,14 @@ def make_pickle(start_from_last=True, pickle_name_ws='ws_overview.pkl', pickle_n
         ws_dict[SPSuser]['timestamp_ws'].append(t_stamp)
         ws_dict[SPSuser]['device_name'].append(wsobj.device_name)
         ws_dict[SPSuser]['bunch_list'].append(wsobj.bunch_list_timber)
-        ws_dict[SPSuser]['norm_emit_in'].append(list(wsobj.norm_emit_in))
+        ws_dict[SPSuser]['norm_emit_in'].append(wsobj.norm_emit_in)
         ws_dict[SPSuser]['norm_emit_out'].append(wsobj.norm_emit_out)
         ws_dict[SPSuser]['area_in'].append(wsobj.area_in)
         ws_dict[SPSuser]['area_out'].append(wsobj.area_out)
         ws_dict[SPSuser]['acq_time_in_cycle_set_in'].append(wsobj.acq_time_in_cycle_set_in/1000.-inj_delay_to_cycle_start)
         ws_dict[SPSuser]['acq_time_in_cycle_set_out'].append(wsobj.acq_time_in_cycle_set_out/1000.-inj_delay_to_cycle_start)
         ws_dict[SPSuser]['acq_type'].append(wsobj.acq_type)
-        
+
     # Sort for ws timestamps.
     for SPSuser in beams.keys():
         ind_sorted = np.argsort(ws_dict[SPSuser]['timestamp_ws'])
@@ -476,7 +569,7 @@ def get_timber_varlist(device_name):
         device_name + ':ACQTIMEINCYCLE_OUT',
         device_name + ':ACQ_TYPE',
         device_name + ':BUNCH_SELECTION',
-        device_name + ':BUNCH_LIST',
+#        device_name + ':BUNCH_LIST',
         device_name + ':CYCLE_TIME',
         device_name + ':GAIN',
         device_name + ':NB_ACQ',
@@ -490,6 +583,10 @@ def get_timber_varlist(device_name):
         device_name + ':PROF_DATA_IN',
         device_name + ':PROF_DATA_OUT',
         device_name + ':PROF_POSITION_IN',
-        device_name + ':PROF_POSITION_OUT' ]
+        device_name + ':PROF_POSITION_OUT'
+        #device_name + '.APP.IN:ENERGY',
+        #device_name + '.APP.OUT:ENERGY',
+        #device_name + '.APP.IN:BETA'
+        ]
 
     return varlist
