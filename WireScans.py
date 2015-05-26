@@ -43,6 +43,7 @@ class WireScan(object):
         self.acq_type = np.int_(np.squeeze(dict_ws['acqType']))
         if self.acq_type == 1:
             self.n_bunches = 1
+            self.bunch_list_timber = np.array([0])
         else:
             self.n_bunches = np.int_(np.squeeze(dict_ws['nbBunches']))
 
@@ -89,15 +90,24 @@ class WireScan(object):
         return self._fitfunc(self.p1_out[bunch_index], self.proj_position_set_out)
 
     def _bunchSelection2bunchList(self):
-
-        pows = []
-        for i, int in enumerate(self.bunch_selection):
-            pos = i*32 + 1
-            while int>0:
-                if int%2 == 1: pows.append(pos)
-                int /= 2
-                pos += 1
-        return pows
+        '''
+        The bunch_selection variable stores the selected bunch pattern
+        in binary form (two's complement). Each entry in the
+        bunch_selection list corresponds to 32 bunch slots (32 bit
+        pattern), i.e. entry 0 describes bunches 0-31, entry 1 bunches
+        32-63, etc. The binary patterns are read from the right and they
+        must be padded to 32 bits from the left. To generate the full
+        boolean mask, the 32 bit patterns (corresponding to one of the
+        entries in the bunch_selection list) are reversed and
+        concatenated. The mask tells us, which of the bunch slots were
+        selected for measurements assuming the following order [ 1, 2, 3,
+        ...  32*len(bunch_selection) + 1 ].
+        '''
+        bin_list = ''
+        for selection in self.bunch_selection:
+            bin_list += ((bin(selection % (1<<32))[2:]).rjust(32, '0'))[::-1]
+        mask = np.bool_(np.array(list(bin_list)))
+        return np.array(range(1, 32*len(self.bunch_selection)+1))[mask]
 
     def _compute_single_fit(self, x, y, N_points_ma):
         try:
@@ -127,16 +137,23 @@ class WireScan(object):
 
         return p0, p1
 
-
     def compute_fits(self, scans_in=True, scans_out=False, N_points_ma=50):
         if scans_in:
             for i in xrange(self.n_bunches):
-                self._p0_in[i], self.p1_in[i] = self._compute_single_fit(self.proj_position_set_in, self.proj_profile_set_in[i], N_points_ma)
+                if self.acq_type == 1:
+                    proj_prof = self.proj_profile_set_in
+                else:
+                    proj_prof = self.proj_profile_set_in[i]
+                self._p0_in[i], self.p1_in[i] = self._compute_single_fit(self.proj_position_set_in, proj_prof, N_points_ma)
                 self.sigma_in[i] = abs(self.p1_in[i][3]*1e-6)
                 self.area_in[i] = abs(self.p1_in[i][1]*self.p1_in[i][3])
 
         if self.scans_out:
             for i in xrange(self.n_bunches):
+                if self.acq_type == 1:
+                    proj_prof = self.proj_profile_set_out
+                else:
+                    proj_prof = self.proj_profile_set_out[i]
                 self._p0_out[i], self.p1_out[i] = self._compute_single_fit(self.proj_position_set_out, self.proj_profile_set_out[i], N_points_ma)
                 self.sigma_out[i] = abs(self.p1_out[i][3]*1e-6)
                 self.area_out[i] = abs(self.p1_out[i][1]*self.p1_out[i][3])
@@ -374,18 +391,46 @@ def make_pickle(start_from_last=True, pickle_name_ws='ws_overview.pkl', pickle_n
             ws_dict[SPSuser]['area_out'] = []
             ws_dict[SPSuser]['acq_time_in_cycle_set_in'] = []
             ws_dict[SPSuser]['acq_time_in_cycle_set_out'] = []
+            ws_dict[SPSuser]['acq_type'] = []
 
     list_files = os.listdir(mat_folder)
     n_files = len(list_files)
+    n_files_no_bct = 0
     if n_files == 0:
         print('No ws mat files found.')
 
     for ctr, filename in enumerate(list_files):
         print('Processing file %d/%d'%(ctr, n_files))
-
         wsobj = WireScan(mat_folder +'/'+ filename, optics='Q20', cycle_type='26GeV_FB',
                          scans_in=True, scans_out=True)
         t_stamp = th.localtime2unixstamp(wsobj.acq_time.split('.')[0], strformat='%Y/%m/%d %H:%M:%S')
+
+        t_stamp_bct = None
+        SPSuser = None
+        guess_t_stamp_bct = int(t_stamp - inj_delay_to_cycle_start - wsobj.acq_time_in_cycle_set_in/1000.)
+        for SPSuser_loop in beams.keys():
+            t_stamps_bct = np.int_(beams[SPSuser_loop]['timestamp_float'])
+            for jj in xrange(4, -1, -1):
+                idx_tstamp = np.where(t_stamps_bct == (guess_t_stamp_bct+jj))[0]
+                if len(idx_tstamp) == 1:
+                    t_stamp_bct = t_stamps_bct[idx_tstamp]
+                    SPSuser = SPSuser_loop
+                    break
+            if not(t_stamp_bct == None):
+                break
+#            mask_past = np.array(t_stamps_bct) <= t_stamp
+#            if any(mask_past):
+#                t_stamp_bct_curr = np.max(np.array(t_stamps_bct)[mask_past])
+#                if t_stamp_bct is None:
+#                    t_stamp_bct = t_stamp_bct_curr
+#                    SPSuser = SPSuser_loop
+#                elif t_stamp_bct_curr > t_stamp_bct:
+#                    t_stamp_bct = t_stamp_bct_curr
+#                    SPSuser = SPSuser_loop
+        if t_stamp_bct == None:
+            print('No corresponding BCT time stamp found')
+            n_files_no_bct += 1
+            continue
 
         if start_from_last and len(ws_dict[SPSuser]['timestamp_ws']) > 0:
             if t_stamp <= ws_dict[SPSuser]['timestamp_ws'][-1]:
@@ -393,37 +438,22 @@ def make_pickle(start_from_last=True, pickle_name_ws='ws_overview.pkl', pickle_n
         elif t_stamp in ws_dict[SPSuser]['timestamp_ws']:
             continue
 
-        t_stamp_bct = None
-        SPSuser = None
-        for SPSuser_loop in beams.keys():
-            t_stamps_bct = beams[SPSuser_loop]['timestamp_float']
-            mask_past = np.array(t_stamps_bct) <= t_stamp
-            if any(mask_past):
-                t_stamp_bct_curr = np.max(np.array(t_stamps_bct)[mask_past])
-                if t_stamp_bct is None:
-                    t_stamp_bct = t_stamp_bct_curr
-                    SPSuser = SPSuser_loop
-                elif t_stamp_bct_curr > t_stamp_bct:
-                    t_stamp_bct = t_stamp_bct_curr
-                    SPSuser = SPSuser_loop
-        if t_stamp_bct == None:
-            print('No corresponding BCT time stamp found')
-            continue
-        if np.abs(t_stamp - t_stamp_bct) > 30:
-            print('WARNING: WS time stamp differs from BCT time stamp by more ' +
-                  'than 30s! Difference is %ds. Saving anyway.'%np.abs(t_stamp-t_stamp_bct))
+#        if np.abs(t_stamp - t_stamp_bct) > 30:
+#            print('WARNING: WS time stamp differs from BCT time stamp by more ' +
+#                  'than 30s! Difference is %ds. Saving anyway.'%np.abs(t_stamp-t_stamp_bct))
 
         ws_dict[SPSuser]['timestamp_bct'].append(t_stamp_bct)
         ws_dict[SPSuser]['timestamp_ws'].append(t_stamp)
         ws_dict[SPSuser]['device_name'].append(wsobj.device_name)
-        ws_dict[SPSuser]['bunch_list'].append(wsobj.bunch_list)
-        ws_dict[SPSuser]['norm_emit_in'].append(wsobj.norm_emit_in)
+        ws_dict[SPSuser]['bunch_list'].append(wsobj.bunch_list_timber)
+        ws_dict[SPSuser]['norm_emit_in'].append(list(wsobj.norm_emit_in))
         ws_dict[SPSuser]['norm_emit_out'].append(wsobj.norm_emit_out)
         ws_dict[SPSuser]['area_in'].append(wsobj.area_in)
         ws_dict[SPSuser]['area_out'].append(wsobj.area_out)
         ws_dict[SPSuser]['acq_time_in_cycle_set_in'].append(wsobj.acq_time_in_cycle_set_in/1000.-inj_delay_to_cycle_start)
         ws_dict[SPSuser]['acq_time_in_cycle_set_out'].append(wsobj.acq_time_in_cycle_set_out/1000.-inj_delay_to_cycle_start)
-
+        ws_dict[SPSuser]['acq_type'].append(wsobj.acq_type)
+        
     # Sort for ws timestamps.
     for SPSuser in beams.keys():
         ind_sorted = np.argsort(ws_dict[SPSuser]['timestamp_ws'])
@@ -432,6 +462,8 @@ def make_pickle(start_from_last=True, pickle_name_ws='ws_overview.pkl', pickle_n
 
     with open(pickle_name_ws, 'wb') as fid:
         pickle.dump(ws_dict, fid)
+    
+    print('Done! %d files could not be matched to a BCT timestamp.'%n_files_no_bct)
 
 
 def get_timber_varlist(device_name):
