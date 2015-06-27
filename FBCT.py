@@ -22,12 +22,26 @@ class FBCT:
         self.time_vect = np.float_(np.squeeze(dict_fbct['measStamp']))*1e-3
         self.fbct_mat = dict_fbct['bunchIntensityFast']
 
-    def profile(self, t_obs):
-        ind_min = np.argmin(np.abs(self.time_vect-t_obs))
-        return self.fbct_mat[ind_min,:]
+    def profile(self, t_obs, get_next_after_tobs=False):
+        if not get_next_after_tobs:
+            ind_min = np.argmin(np.abs(self.time_vect-t_obs))
+            return self.fbct_mat[ind_min,:]
+        else:
+            mask = np.ma.masked_less(self.time_vect, t_obs)
+            ind_min = np.argmin(mask)
+            return self.fbct_mat[ind_min,:]
 
-    def normalized_profile(self, t_obs, bct_total_intensity):
-        subtracted_profile = self.subtract_baseline_profile(t_obs)
+    def eff_time_at_tobs(self, t_obs, get_next_after_tobs=False):
+        if not get_next_after_tobs:
+            ind_min = np.argmin(np.abs(self.time_vect-t_obs))
+            return self.time_vect[ind_min]
+        else:
+            mask = np.ma.masked_less(self.time_vect, t_obs)
+            t_eff = np.amin(mask)
+            return t_eff
+
+    def normalized_profile(self, t_obs, bct_total_intensity, get_next_after_tobs=False):
+        subtracted_profile = self.subtract_baseline_profile(t_obs, get_next_after_tobs)
         integral = np.trapz(subtracted_profile)
         try:
             normalized = subtracted_profile / integral
@@ -35,8 +49,12 @@ class FBCT:
             normalized = np.zeros(len(subtracted_profile))
         return normalized * bct_total_intensity
 
-    def subtract_baseline_profile(self, t_obs):
-        ind_min = np.argmin(np.abs(self.time_vect-t_obs))
+    def subtract_baseline_profile(self, t_obs, get_next_after_tobs=False):
+        if not get_next_after_tobs:
+            ind_min = np.argmin(np.abs(self.time_vect-t_obs))
+        else:
+            mask = np.ma.masked_less(self.time_vect - t_obs, 0)
+            ind_min = np.argmin(mask)
         signal_threshold = 0.2*np.max(self.fbct_mat[ind_min,:])
         below_thresh_idx = np.where(self.fbct_mat[ind_min,:] < signal_threshold)[0]
         baseline = np.mean(self.fbct_mat[ind_min,below_thresh_idx])
