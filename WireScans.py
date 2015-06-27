@@ -525,11 +525,11 @@ def make_pickle(start_from_last=True, pickle_name_ws='ws_overview.pkl', pickle_n
             n_files_no_bct += 1
             continue
 
-        if start_from_last and len(ws_dict[SPSuser]['timestamp_ws']) > 0:
-            if t_stamp <= ws_dict[SPSuser]['timestamp_ws'][-1]:
-                continue
-        elif t_stamp in ws_dict[SPSuser]['timestamp_ws']:
-            continue
+        #if start_from_last and len(ws_dict[SPSuser]['timestamp_ws']) > 0:
+        #    if t_stamp <= ws_dict[SPSuser]['timestamp_ws'][-1]:
+        #        continue
+        #elif t_stamp in ws_dict[SPSuser]['timestamp_ws']:
+        #    continue
 
 #        if np.abs(t_stamp - t_stamp_bct) > 30:
 #            print('WARNING: WS time stamp differs from BCT time stamp by more ' +
@@ -556,7 +556,7 @@ def make_pickle(start_from_last=True, pickle_name_ws='ws_overview.pkl', pickle_n
 
     with open(pickle_name_ws, 'wb') as fid:
         pickle.dump(ws_dict, fid)
-    
+
     print('Done! %d files could not be matched to a BCT timestamp.'%n_files_no_bct)
 
 

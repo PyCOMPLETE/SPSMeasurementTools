@@ -150,8 +150,6 @@ def sdds_to_dict(in_complete_path):
 		}
 
 	return dict_meas
-	
-
 
 def sdds_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='multiq/'):
 
