@@ -68,7 +68,7 @@ class Pressure:
             return np.mean(self.press_mat, axis=1)
 
 
-def make_pickle(start_from_last=True, pickle_name_press='press_overview.pkl', pickle_name_bct='bct_overview.pkl', mat_folder='press_mat_cycles/', mat_file_prefix='SPSmeas_', t_obs_1st_inj=1.5, SPSuser_blacklist = [], list_gauges=[10660, 20660, 30660, 40660, 50660, 60660, 11879, 11959, 51080, 51140, 51280, 51340, 10060, 20060, 30060, 40060, 50060]):
+def make_pickle(start_from_last=True, pickle_name_press='press_overview.pkl', pickle_name_bct='bct_overview.pkl', mat_folder='press_mat_cycles/', mat_file_prefix='SPSmeas_', t_obs_1st_inj=1.5, SPSuser_blacklist = ['LHC1','LHC25NS','SFTPRO3'], list_gauges=[10660, 20660, 30660, 40660, 50660, 60660, 10060, 20060, 30060, 40060, 50060, 60060, 11879, 11959, 11936, 21633, 21691, 31673, 31760,31852, 31872, 41737, 51080, 51140, 51280, 41737, 41751, 31872]):
 
     with open(pickle_name_bct) as fid:
 	beams_bct = pickle.load(fid)
@@ -171,9 +171,11 @@ def csv_to_mat_gauges(csv_data_folder='pressure_data', mat_folder='press_mat'):
 	    file_content = []
 
 	    for line in file_lines:
-		    append_vec = line.split('\t')
-		    append_vec[-1] = (append_vec[-1]).split('\n')[0]
-		    file_content.append(append_vec)
+                append_vec = line.split('\t')
+                append_vec[-1] = (append_vec[-1]).split('\n')[0]
+                append_vec[-1] = (append_vec[-1]).split('\r')[0]
+
+                file_content.append(append_vec)
 	
 	    header = file_content[0]
 	
