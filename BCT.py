@@ -64,7 +64,7 @@ class BCT:
 			return 0., 0.
 
 
-def make_pickle(pickle_name='bct_overview.pkl', mat_folder='bct/', t_obs_1st_inj=1.5):
+def make_pickle(pickle_name='bct_overview.pkl', mat_folder='bct/', t_obs_1st_inj=1.5, t_obs_5th_inj=14.4):
 
 	if os.path.isfile(pickle_name):
 		with open(pickle_name) as fid:
@@ -85,6 +85,7 @@ def make_pickle(pickle_name='bct_overview.pkl', mat_folder='bct/', t_obs_1st_inj
 			beams[SPSuser]['bct_integrated'] = np.array([])
 			beams[SPSuser]['bct_1st_inj'] = np.array([])
 			beams[SPSuser]['acqusition_time_length'] = np.array([])
+			beams[SPSuser]['bct_5th_inj'] = np.array([])
 
 		list_bct_files = os.listdir(mat_folder +'/'+ SPSuser)
 		N_cycles = len(list_bct_files)
@@ -104,6 +105,8 @@ def make_pickle(pickle_name='bct_overview.pkl', mat_folder='bct/', t_obs_1st_inj
 				beams[SPSuser]['timestamp_float'] = np.append(beams[SPSuser]['timestamp_float'], curr_bct.time_start_cycle_float)
 				beams[SPSuser]['bct_integrated'] = np.append(beams[SPSuser]['bct_integrated'], curr_bct.integral())
 				beams[SPSuser]['bct_1st_inj'] = np.append(beams[SPSuser]['bct_1st_inj'], curr_bct.nearest_sample(t_obs_1st_inj))
+				beams[SPSuser]['bct_5th_inj'] = np.append(beams[SPSuser]['bct_5th_inj'], curr_bct.nearest_sample(t_obs_5th_inj))
+
 				beams[SPSuser]['acqusition_time_length'] = np.append(beams[SPSuser]['acqusition_time_length'], np.max(curr_bct.time_vect))
 
 			except IOError as err:
@@ -181,7 +184,7 @@ def sdds_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='
 	dict_meas = sdds_to_dict(in_complete_path)
 	us_string = dict_meas['SPSuser']
 	t_stamp_unix = dict_meas['t_stamp_unix']
-	device_name = dict_meas['deviceName']
+	device_name = 'SPS.' + dict_meas['deviceName']
 
 	out_filename = mat_filename_prefix + us_string +'_'+  device_name + ('_%d'%t_stamp_unix)
 	out_complete_path = outp_folder + us_string +'/'+ out_filename
