@@ -23,17 +23,25 @@ class Pressure:
         self.press_mat = np.float_(np.squeeze(dict_press['press_mat']))
 
     def extract_gauges(self, list_gau_numb=None):
-        submat = np.zeros((len(list_gau_numb), len(self.time_vect)))
-        kk = 0
-        sub_gau_numb = np.zeros(len(list_gau_numb), dtype=int)
-        sub_gau_s = np.zeros(len(list_gau_numb))
-        for gau_numb in list_gau_numb:
-            index = np.where(self.gau_numb_vect == gau_numb)
-            submat[kk,:] = self.press_mat[index,:]
-            sub_gau_numb[kk] = self.gau_numb_vect[index]
-            sub_gau_s[kk] = self.s_gau[index]
-
-            kk = kk + 1
+        if list_gau_numb == None:
+                submat = self.press_mat
+                sub_gau_numb = self.gau_numb_vect
+                sub_gau_s = self.s_gau
+        else:
+            submat = np.zeros((len(list_gau_numb), len(self.time_vect)))
+            kk = 0
+            sub_gau_numb = np.zeros(len(list_gau_numb), dtype=int)
+            sub_gau_s = np.zeros(len(list_gau_numb))
+            for gau_numb in list_gau_numb:
+                if gau_numb not in self.gau_numb_vect:
+                    sub_gau_numb[kk] = gau_numb
+                else:
+                    index = np.where(self.gau_numb_vect == gau_numb)
+                    submat[kk,:] = self.press_mat[index,:]
+                    sub_gau_numb[kk] = self.gau_numb_vect[index]
+                    sub_gau_s[kk] = self.s_gau[index]
+    
+                kk = kk + 1
 
         if len(list_gau_numb) == 1:
             submat = np.squeeze(submat)
@@ -42,33 +50,45 @@ class Pressure:
 
         return submat, sub_gau_numb, sub_gau_s
 
-    def get_p_init(self):
-        return np.squeeze(self.press_mat[:,0])
+    def get_p_init(self, list_gau_numb=None):
+        p_temp,_,_  = self.extract_gauges(list_gau_numb)
+        if len(p_temp.shape) > 1:
+            return np.squeeze(p_temp[:,0])
+        else:   
+            return [np.squeeze(p_temp[0])]
 
-    def get_p_final(self):
-        return np.squeeze(self.press_mat[:,-1])
+    def get_p_final(self, list_gau_numb=None):
+        p_temp,_,_  = self.extract_gauges(list_gau_numb)
+        if len(p_temp.shape) > 1:
+            return np.squeeze(p_temp[:,-1])
+        else:   
+            return [np.squeeze(p_temp[-1])]
 
     def get_min_max(self, min_cut=0, max_cut=0, list_gau_numb=None):
-        if list_gau_numb is not None:
-            p_temp,_,_  = self.extract_gauges(list_gau_numb)
+        p_temp,_,_  = self.extract_gauges(list_gau_numb)
+        if len(p_temp.shape) > 1:
             p_sorted = np.sort(p_temp, axis=1)
         else:
-            p_sorted = np.sort(self.press_mat, axis=1)
-
+            p_sorted = np.array([np.sort(p_temp)])
         p_min = np.squeeze(p_sorted[:,min_cut])
         p_max = np.squeeze(p_sorted[:,-1-max_cut])
+
+        if p_min.shape == ():
+            p_min = [float(p_min)]
+            p_max = [float(p_max)]
 
         return p_min, p_max
 
     def get_aver(self, list_gau_numb=None):
-        if list_gau_numb is not None:
-            p_temp,_,_ = self.extract_gauges(list_gau_numb)
+        p_temp,_,_ = self.extract_gauges(list_gau_numb)
+        if len(p_temp.shape) > 1:
             return np.mean(p_temp, axis=1)
         else:
-            return np.mean(self.press_mat, axis=1)
-
-
-def make_pickle(start_from_last=True, pickle_name_press='press_overview.pkl', pickle_name_bct='bct_overview.pkl', mat_folder='press_mat_cycles/', mat_file_prefix='SPSmeas_', t_obs_1st_inj=1.5, SPSuser_blacklist = ['LHC1','LHC25NS','SFTPRO3'], list_gauges=[10660, 20660, 30660, 40660, 50660, 60660, 10060, 20060, 30060, 40060, 50060, 60060, 11879, 11959, 11936, 21633, 21691, 31673, 31760,31852, 31872, 41737, 51080, 51140, 51280, 41737, 41751, 31872]):
+            return [np.mean(p_temp)]
+        
+        
+        
+def make_pickle(start_from_last=True, pickle_name_press='press_overview.pkl', pickle_name_bct='bct_overview.pkl', mat_folder='press_mat_cycles/', mat_file_prefix='SPSmeas_', t_obs_1st_inj=1.5, SPSuser_blacklist = [], list_gauges=[10660, 20660, 30660, 40660, 50660, 60660, 11879, 11959, 51080, 51140, 51280, 51340, 10060, 20060, 30060, 40060, 50060, 60060]):
 
     with open(pickle_name_bct) as fid:
 	beams_bct = pickle.load(fid)
@@ -112,14 +132,14 @@ def make_pickle(start_from_last=True, pickle_name_press='press_overview.pkl', pi
 
             print '%s %d/%d'%(SPSuser, ii, N_cycles-1)
 
-            try:		
+            try:
                 press_filename = mat_file_prefix + SPSuser + '_press_' + ('%d'%t_stamp)
                 press_curr = Pressure(mat_folder + SPSuser +'/'+ press_filename)
                 press_min, press_max = press_curr.get_min_max(min_cut=0, max_cut=0, list_gau_numb=list_gauges)
                 press_av = press_curr.get_aver(list_gau_numb=list_gauges)
-                press_init = press_curr.get_p_init()
-                press_final = press_curr.get_p_final()
-	
+                press_init = press_curr.get_p_init(list_gau_numb=list_gauges)
+                press_final = press_curr.get_p_final(list_gau_numb=list_gauges)
+
                 for iig in range(len(list_gauges)):
                     gauge = list_gauges[iig]
                     if t_stamp in beams[gauge]['timestamp_bct']:
@@ -139,10 +159,10 @@ def make_pickle(start_from_last=True, pickle_name_press='press_overview.pkl', pi
             except IndexError as indexerror:
                 print 'Index Error!'
                 print indexerror
-            except ValueError as valueerror:
-                print 'Value Error!'
-                print valueerror	
-		
+            # except ValueError as valueerror:
+                # print 'Value Error!'
+                # print valueerror
+
         for gauge in list_gauges:
             ind_sorted = np.argsort(beams[gauge]['timestamp_bct'])
             for kk in beams[gauge].keys():
@@ -150,7 +170,7 @@ def make_pickle(start_from_last=True, pickle_name_press='press_overview.pkl', pi
 
         with open(pickle_name_press, 'w') as fid:
             pickle.dump(press_dict,fid)
-		
+
 
 
 def csv_to_mat_gauges(csv_data_folder='pressure_data', mat_folder='press_mat'):
@@ -160,14 +180,14 @@ def csv_to_mat_gauges(csv_data_folder='pressure_data', mat_folder='press_mat'):
     gauges={}
 
     for filename in list_press_files:
-	
+
 	    print filename
-	
+
 	    complete_path = csv_data_folder+'/'+filename
-	
+
 	    with open(complete_path) as fid:
 		    file_lines = fid.readlines()
-	
+
 	    file_content = []
 
 	    for line in file_lines:
@@ -285,5 +305,3 @@ def make_cycle_mat_files(mat_folder='press_mat/', mat_file_prefix='SPSmeas_', ou
                         'SPSuser':SPSuser})
             else:
                 print time.localtime(t_start_cycle)
-		
-		
