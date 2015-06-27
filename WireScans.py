@@ -456,7 +456,7 @@ def make_mat_files(start_time, end_time='Now', list_device_names=None, csv_data_
         csv_to_file(in_complete_path, filename_converted=filename_converted)
 
 
-def make_pickle(start_from_last=True, pickle_name_ws='ws_overview.pkl', pickle_name_bct='bct_overview.pkl',
+def make_pickle(start_from_last=False, pickle_name_ws='ws_overview.pkl', pickle_name_bct='bct_overview.pkl',
                 mat_folder='wirescanner', mat_file_prefix='SPSmeas_', inj_delay_to_cycle_start=1015e-3,
                 cycle_csv_filepath='SPSMeasurementTools/cycle_momenta/MD_SCRUB_26_L26400_Q20_2014_V1.csv'):
 
@@ -525,11 +525,11 @@ def make_pickle(start_from_last=True, pickle_name_ws='ws_overview.pkl', pickle_n
             n_files_no_bct += 1
             continue
 
-        if start_from_last and len(ws_dict[SPSuser]['timestamp_ws']) > 0:
-            if t_stamp <= ws_dict[SPSuser]['timestamp_ws'][-1]:
-                continue
-        elif t_stamp in ws_dict[SPSuser]['timestamp_ws']:
-            continue
+        #if start_from_last and len(ws_dict[SPSuser]['timestamp_ws']) > 0:
+        #    if t_stamp <= ws_dict[SPSuser]['timestamp_ws'][-1]:
+        #        continue
+        #elif t_stamp in ws_dict[SPSuser]['timestamp_ws']:
+        #    continue
 
 #        if np.abs(t_stamp - t_stamp_bct) > 30:
 #            print('WARNING: WS time stamp differs from BCT time stamp by more ' +
@@ -538,7 +538,7 @@ def make_pickle(start_from_last=True, pickle_name_ws='ws_overview.pkl', pickle_n
         ws_dict[SPSuser]['timestamp_bct'].append(t_stamp_bct)
         ws_dict[SPSuser]['timestamp_ws'].append(t_stamp)
         ws_dict[SPSuser]['device_name'].append(wsobj.device_name)
-        ws_dict[SPSuser]['bunch_list'].append(wsobj.bunch_list_timber)
+        ws_dict[SPSuser]['bunch_list'].append(wsobj.bunch_list)
         ws_dict[SPSuser]['norm_emit_in'].append(wsobj.norm_emit_in)
         ws_dict[SPSuser]['norm_emit_out'].append(wsobj.norm_emit_out)
         ws_dict[SPSuser]['area_in'].append(wsobj.area_in)
@@ -555,7 +555,7 @@ def make_pickle(start_from_last=True, pickle_name_ws='ws_overview.pkl', pickle_n
 
     with open(pickle_name_ws, 'wb') as fid:
         pickle.dump(ws_dict, fid)
-    
+
     print('Done! %d files could not be matched to a BCT timestamp.'%n_files_no_bct)
 
 
