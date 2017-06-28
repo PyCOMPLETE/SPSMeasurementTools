@@ -240,7 +240,7 @@ class WireScan(object):
                     proj_prof = self.proj_profile_set_out
                 else:
                     proj_prof = self.proj_profile_set_out[i]
-                self._p0_out[i], self.p1_out[i] = self._compute_single_fit(self.proj_position_set_out, self.proj_profile_set_out[i], N_points_ma)
+                self._p0_out[i], self.p1_out[i] = self._compute_single_fit(self.proj_position_set_out, proj_prof, N_points_ma)
                 self.sigma_out[i] = abs(self.p1_out[i][3]*1e-6)
                 self.area_out[i] = abs(self.p1_out[i][1]*self.p1_out[i][3])
 
@@ -307,8 +307,10 @@ def timber_to_csv(start_time, end_time='Now', filename_prefix='SPSmeas_', outp_f
         if outp_compl_path in list_retrieved:
             continue
         lldb.dbquery(varlist, t_query, t_query+t_query_interval, outp_compl_path)
-        with open(filename_retrieved, 'a+') as fid:
-            fid.write(outp_compl_path + '\n')
+        now = th.time.mktime(th.time.localtime())
+        if now - t_query > 2*3600:
+            with open(filename_retrieved, 'a+') as fid:
+                fid.write(outp_compl_path + '\n')
 
         # In case something goes wrong with the request -> use a shorter interval.
         if not os.path.exists(outp_compl_path):
@@ -352,35 +354,43 @@ def csv_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='w
 
         for i in xrange(N_meas):
             cycleTime = variables[device_name + ':CYCLE_TIME'].values[i][0]
-            str_cycleTime = cycleTime.replace('"', '').replace('\n', '').split('.')[0]
-            t_stamp_unix = th.localtime2unixstamp(str_cycleTime, strformat='%Y/%m/%d %H:%M:%S')
-            acqClockDiv = np.int_(variables[device_name + ':ACQ_CLOCK_DIV'].values[i][0])
-            acqDelay = np.int_(variables[device_name + ':ACQ_DELAY'].values[i][0])
-            acqTime = variables[device_name + ':ACQ_TIME'].values[i][0]
-            acqTimeInCycleSet1 = np.int_(variables[device_name + ':ACQTIMEINCYCLE_IN'].values[i][0])
-            acqTimeInCycleSet2 = np.int_(variables[device_name + ':ACQTIMEINCYCLE_OUT'].values[i][0])
-            acqType = np.int_(variables[device_name + ':ACQ_TYPE'].values[i][0])
-            bunchSelection = np.int_(np.float_(variables[device_name + ':BUNCH_SELECTION'].values[i]))
-            #bunchListTimber = np.int_(np.float_(variables[device_name + ':BUNCH_LIST'].values[i]))
-            gain = np.float_(variables[device_name + ':GAIN'].values[i][0])
-            nbAcq = np.int_(variables[device_name + ':NB_ACQ'].values[i][0])
-            nbBunches = np.int_(variables[device_name + ':NB_BUNCHES'].values[i][0])
-            nbPtsPerProjInSet1 = np.int_(variables[device_name + ':NB_PTS_SCAN_IN'].values[i][0])
-            nbPtsPerProjInSet2 = np.int_(variables[device_name + ':NB_PTS_SCAN_OUT'].values[i][0])
-            potPosRawSet1 = np.float_(variables[device_name + ':RAW_POSITION_IN'].values[i])
-            potPosRawSet2 = np.float_(variables[device_name + ':RAW_POSITION_OUT'].values[i])
-            projBunchDataSet1 = np.float_(variables[device_name + ':PROJ_BUNCH_DATASET1'].values[i])
-            projBunchDataSet2 = np.float_(variables[device_name + ':PROJ_BUNCH_DATASET2'].values[i])
-            projDataSet1 = np.float_(variables[device_name + ':PROF_DATA_IN'].values[i])
-            projDataSet2 = np.float_(variables[device_name + ':PROF_DATA_OUT'].values[i])
-            projPositionSet1 = np.float_(variables[device_name + ':PROF_POSITION_IN'].values[i])
-            projPositionSet2 = np.float_(variables[device_name + ':PROF_POSITION_OUT'].values[i])
-            #beta = np.float_(variables[device_name + '.APP.IN:BETA'].values[i][0])
-            #energy1 = np.float_(variables[device_name + '.APP.IN:ENERGY'].values[i][0])
-            #try:
-            #    energy2 = np.float_(variables[device_name + '.APP.OUT:ENERGY'].values[i][0])
-            #except IndexError:
-            #    energy2 = 0.
+            if cycleTime == 'null':
+            	continue
+            try: 
+                str_cycleTime = cycleTime.replace('"', '').replace('\n', '').split('.')[0]
+                t_stamp_unix = th.localtime2unixstamp(str_cycleTime, strformat='%Y/%m/%d %H:%M:%S')
+                acqClockDiv = np.int_(variables[device_name + ':ACQ_CLOCK_DIV'].values[i][0])
+                acqDelay = np.int_(variables[device_name + ':ACQ_DELAY'].values[i][0])
+                acqTime = variables[device_name + ':ACQ_TIME'].values[i][0]
+                acqTimeInCycleSet1 = np.int_(variables[device_name + ':ACQTIMEINCYCLE_IN'].values[i][0])
+                acqTimeInCycleSet2 = np.int_(variables[device_name + ':ACQTIMEINCYCLE_OUT'].values[i][0])
+                acqType = np.int_(variables[device_name + ':ACQ_TYPE'].values[i][0])
+                bunchSelection = np.int_(np.float_(variables[device_name + ':BUNCH_SELECTION'].values[i]))
+                #bunchListTimber = np.int_(np.float_(variables[device_name + ':BUNCH_LIST'].values[i]))
+                gain = np.float_(variables[device_name + ':GAIN'].values[i][0])
+                nbAcq = np.int_(variables[device_name + ':NB_ACQ'].values[i][0])
+                nbBunches = np.int_(variables[device_name + ':NB_BUNCHES'].values[i][0])
+                nbPtsPerProjInSet1 = np.int_(variables[device_name + ':NB_PTS_SCAN_IN'].values[i][0])
+                nbPtsPerProjInSet2 = np.int_(variables[device_name + ':NB_PTS_SCAN_OUT'].values[i][0])
+                potPosRawSet1 = np.float_(variables[device_name + ':RAW_POSITION_IN'].values[i])
+                potPosRawSet2 = np.float_(variables[device_name + ':RAW_POSITION_OUT'].values[i])
+                projBunchDataSet1 = np.float_(variables[device_name + ':PROJ_BUNCH_DATASET1'].values[i])
+                projBunchDataSet2 = np.float_(variables[device_name + ':PROJ_BUNCH_DATASET2'].values[i])
+                projDataSet1 = np.float_(variables[device_name + ':PROF_DATA_IN'].values[i])
+                projDataSet2 = np.float_(variables[device_name + ':PROF_DATA_OUT'].values[i])
+                projPositionSet1 = np.float_(variables[device_name + ':PROF_POSITION_IN'].values[i])
+                projPositionSet2 = np.float_(variables[device_name + ':PROF_POSITION_OUT'].values[i])
+                #beta = np.float_(variables[device_name + '.APP.IN:BETA'].values[i][0])
+                #energy1 = np.float_(variables[device_name + '.APP.IN:ENERGY'].values[i][0])
+                #try:
+                #    energy2 = np.float_(variables[device_name + '.APP.OUT:ENERGY'].values[i][0])
+                #except IndexError:
+                #    energy2 = 0.
+            except Exception as err:
+                print 'Skipped: %s' %cycleTime
+                print '  Got exception:'
+                print err
+                continue
 
             dict_meas = {
                 'acqClockDiv': acqClockDiv,
@@ -412,19 +422,23 @@ def csv_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='w
                 'device_name': device_name }
 
             out_filename = mat_filename_prefix + device_name + ('_%d'%t_stamp_unix)
-            out_complete_path = outp_folder +'/'+ out_filename
+            out_complete_folder = '%s/%s'%(outp_folder,device_name)
+            out_complete_path = '%s/%s'%(out_complete_folder,out_filename)
             print out_complete_path
 
-            if not os.path.isdir(outp_folder):
-                print 'I create folder: '+ outp_folder
-                os.makedirs(outp_folder)
+            if not os.path.isdir(out_complete_folder):
+                print 'I create folder: '+ out_complete_folder
+                os.makedirs(out_complete_folder)
 
             sio.savemat(out_complete_path, dict_meas, oned_as='row')
             save_zip(out_complete_path)
 
-    with open(filename_converted, 'a+') as fid:
-        fid.write(in_complete_path + '\n')
-
+    now = th.time.mktime(th.time.localtime())
+    t = int(in_complete_path.split('_')[-2])
+    if now - t > 2*3600:
+        with open(filename_converted, 'a+') as fid:
+            fid.write(in_complete_path + '\n')
+    
 
 def make_mat_files(start_time, end_time='Now', list_device_names=None, csv_data_folder='WS_CSVfromTimberDB',
                    filename_converted='ws_converted.txt', filename_retrieved='ws_retrieved.txt'):
