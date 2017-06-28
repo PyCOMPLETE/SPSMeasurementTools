@@ -30,6 +30,8 @@ class MultiQ(object):
 		self.rawData_H = dict_multiq['rawData_H']
 		self.rawData_V = dict_multiq['rawData_V']
 		self.acqStartTimes = np.squeeze(dict_multiq['acqStartTimes'])
+		self.excitationAmplitudeH = dict_multiq['excitationAmplitudeH']
+		self.excitationAmplitudeV = dict_multiq['excitationAmplitudeV']
 
 	def get_fft(self, plane='H'):
 		''' Use plane='H' for horizontal and plane='V' for vertical

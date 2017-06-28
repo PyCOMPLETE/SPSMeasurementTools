@@ -25,6 +25,10 @@ class BQM(object):
         dict_bqm = sio.loadmat(temp_filename)
         os.remove(temp_filename)
         
+        self.attenuator_ppm_setting = np.int(np.squeeze(dict_bqm['attenuator_ppm_setting']))
+        self.filled_buckets = np.squeeze(dict_bqm['filled_buckets'])
+        self.raw_waveform_inj = dict_bqm['raw_waveform_inj'][0]
+        
         self.dict_bqm = dict_bqm
         print dict_bqm.keys()  
 #~ 
@@ -253,15 +257,15 @@ def csv_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='b
     N_meas = len(variables['SPS.BQM:NO_BUNCHES'].t_stamps)
     for i in [0]: #xrange(N_meas):
         dict_meas = {\
-            'attenuator_ppm_setting': variables['SPS.APWL.ATTENUATOR:PPM_SETTING'].values[i][0],
+            'attenuator_ppm_setting': np.int_(variables['SPS.APWL.ATTENUATOR:PPM_SETTING'].values[i][0]),
             #~ 'beam_ok': variables['SPS.BQM:BEAM_OK'].values[i][0],
-            'no_bunches': variables['SPS.BQM:NO_BUNCHES'].values[i][0],
-            'bunch_intensities': variables['SPS.BQM:BUNCH_INTENSITIES'].values[i],
+            #'no_bunches': variables['SPS.BQM:NO_BUNCHES'].values[i][0],
+            #'bunch_intensities': variables['SPS.BQM:BUNCH_INTENSITIES'].values[i],
             #~ 'bunch_intensity_max_thresh': variables['SPS.BQM:BUNCH_INTENSITY_MAX_THRESH'].values[i][0],
             #~ 'bunch_intensity_min_thresh': variables['SPS.BQM:BUNCH_INTENSITY_MIN_THRESH'].values[i][0],
-            'bunch_intensity_ok': variables['SPS.BQM:BUNCH_INTENSITY_OK'].values[i][0],
-            'bunch_lengths': variables['SPS.BQM:BUNCH_LENGTHS'].values[i],
-            'bunch_lengths_inj': variables['SPS.BQM:BUNCH_LENGTHS_INJ'].values[i],
+            #'bunch_intensity_ok': variables['SPS.BQM:BUNCH_INTENSITY_OK'].values[i][0],
+            #'bunch_lengths': variables['SPS.BQM:BUNCH_LENGTHS'].values[i],
+            #'bunch_lengths_inj': variables['SPS.BQM:BUNCH_LENGTHS_INJ'].values[i],
             #~ 'bunch_lengths_inj_max_thresh': variables['SPS.BQM:BUNCH_LENGTH_INJ_MAX_THRESH'].values[i][0],
             #~ 'bunch_length_max_thresh': variables['SPS.BQM:BUNCH_LENGTH_MAX_THRESH'].values[i][0],
             #~ 'bunch_length_min_thresh': variables['SPS.BQM:BUNCH_LENGTH_MIN_THRESH'].values[i][0],
@@ -269,25 +273,25 @@ def csv_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='b
             #~ 'bunch_length_stddev_ok': variables['SPS.BQM:BUNCH_LENGTH_STDDEV_OK'].values[i][0],
             #~ 'bunch_length_stddev_thresh': variables['SPS.BQM:BUNCH_LENGTH_STDDEV_THRESH'].values[i][0],
             #~ 'bunch_pattern_ok': variables['SPS.BQM:BUNCH_PATTERN_OK'].values[i][0],
-            'bunch_peaks': variables['SPS.BQM:BUNCH_PEAKS'].values[i],
-            'bunch_peaks_inj': variables['SPS.BQM:BUNCH_PEAKS_INJ'].values[i],
+            #'bunch_peaks': variables['SPS.BQM:BUNCH_PEAKS'].values[i],
+            #'bunch_peaks_inj': variables['SPS.BQM:BUNCH_PEAKS_INJ'].values[i],
             #~ 'bunch_peak_max_thresh': variables['SPS.BQM:BUNCH_PEAK_MAX_THRESH'].values[i][0],
             #~ 'bunch_peak_min_thresh': variables['SPS.BQM:BUNCH_PEAK_MIN_THRESH'].values[i][0],
-            'bunch_peak_ok': variables['SPS.BQM:BUNCH_PEAK_OK'].values[i][0],
-            'bunch_peak_stddev_ok': variables['SPS.BQM:BUNCH_PEAK_STDDEV_OK'].values[i][0],
+            #'bunch_peak_ok': variables['SPS.BQM:BUNCH_PEAK_OK'].values[i][0],
+            #'bunch_peak_stddev_ok': variables['SPS.BQM:BUNCH_PEAK_STDDEV_OK'].values[i][0],
             #~ 'bunch_peak_stddev_thresh': variables['SPS.BQM:BUNCH_PEAK_STDDEV_THRESH'].values[i][0],
-            'bunch_positions': variables['SPS.BQM:BUNCH_POSITIONS'].values[i],
-            'bunch_positions_inj': variables['SPS.BQM:BUNCH_POSITIONS_INJ'].values[i],
-            'diagnostics': variables['SPS.BQM:DIAGNOSTIC'].values[i][0],
-            'doublets': variables['SPS.BQM:DOUBLETS'].values[i][0],
-            'doublets_int_splits': variables['SPS.BQM:DOUBLET_INT_SPLITS'].values[i],
-            'doublets_int_splits_max_thres': variables['SPS.BQM:DOUBLET_INT_SPLIT_MAX_THRESH'].values[i][0],
-            'doublets_int_splits_min_thres': variables['SPS.BQM:DOUBLET_INT_SPLIT_MIN_THRESH'].values[i][0],
+            #'bunch_positions': variables['SPS.BQM:BUNCH_POSITIONS'].values[i],
+            #'bunch_positions_inj': variables['SPS.BQM:BUNCH_POSITIONS_INJ'].values[i],
+            #'diagnostics': variables['SPS.BQM:DIAGNOSTIC'].values[i][0],
+            #'doublets': variables['SPS.BQM:DOUBLETS'].values[i][0],
+            #'doublets_int_splits': variables['SPS.BQM:DOUBLET_INT_SPLITS'].values[i],
+            #'doublets_int_splits_max_thres': variables['SPS.BQM:DOUBLET_INT_SPLIT_MAX_THRESH'].values[i][0],
+            #'doublets_int_splits_min_thres': variables['SPS.BQM:DOUBLET_INT_SPLIT_MIN_THRESH'].values[i][0],
             #~ 'dump_enabled': variables['SPS.BQM:DUMP_ENABLED'].values[i][0],
-            'doublets_int_splits_ok': variables['SPS.BQM:DOUBLET_INT_SPLIT_OK'].values[i][0],
-            'filled_buckets': variables['SPS.BQM:FILLED_BUCKETS'].values[i],
-            'first_bunch_pos_inj_ok': variables['SPS.BQM:FIRST_BUNCH_POS_INJ_OK'].values[i][0],
-            'raw_waveform_inj': variables['SPS.BQM:RAW_WAVEFORM_INJ'].values[i],
+            #'doublets_int_splits_ok': variables['SPS.BQM:DOUBLET_INT_SPLIT_OK'].values[i][0],
+            'filled_buckets': np.int_(np.float_(variables['SPS.BQM:FILLED_BUCKETS'].values[i])),
+            #'first_bunch_pos_inj_ok': variables['SPS.BQM:FIRST_BUNCH_POS_INJ_OK'].values[i][0],
+            'raw_waveform_inj': np.float_(variables['SPS.BQM:RAW_WAVEFORM_INJ'].values[i]),
 			}
             
         
