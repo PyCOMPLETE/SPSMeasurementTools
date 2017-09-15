@@ -36,7 +36,7 @@ class ECLDMON:
 
         #compensate detector gain
         for ii in range(len(TOTAL_GAIN)):
-            ecld_mon_rescaled[:,ii*16:(ii+1)*16-1] = ecld_mon_rescaled[:,ii*16:(ii+1)*16-1]/TOTAL_GAIN[ii]
+            ecld_mon_rescaled[:,ii*16:(ii+1)*16] = ecld_mon_rescaled[:,ii*16:(ii+1)*16]/TOTAL_GAIN[ii]
 
         #compensate integration time
         self.time_vect = np.squeeze(dict_ecld['PROFILE_CYCLE_TIME'])
