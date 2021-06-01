@@ -207,8 +207,10 @@ def sdds_to_dict(in_complete_path):
         key_string = 'SEM-PROFILE-%d'%(ii+1)
         eclm_data[ii,:] = data[key_string]
 
-    device_name = in_complete_path.split('-')[0].split('/')[-1]
-    us_string = in_complete_path.split('-')[1].split('.')[-1]
+    # device_name = in_complete_path.split('-')[0].split('/')[-1]
+    # us_string = in_complete_path.split('-')[1].split('.')[-1]
+    device_name = in_complete_path.split('-')[1]
+    us_string = in_complete_path.split('-')[2].split('.')[-1]
 
     dict_meas =  {
     'ACQ_COMMENT':acq_comment,
@@ -246,7 +248,8 @@ def sdds_to_file(in_complete_path, mat_filename_prefix='SPSmeas_', outp_folder='
             print('I create folder: '+ out_directory)
             os.makedirs(out_directory)
 
-    sio.savemat(out_complete_path, dict_meas, oned_as='row')
+    # sio.savemat(out_complete_path, dict_meas, oned_as='row')
+    sio.savemat(out_complete_path + '.mat', dict_meas, oned_as='row')
     save_zip(out_complete_path)
 
 

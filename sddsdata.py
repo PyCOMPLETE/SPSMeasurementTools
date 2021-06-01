@@ -123,9 +123,9 @@ class sddsdata(object):
   def __init__(self,filename,endian='little',full=True):
     self.filename=filename
     if filename.endswith('.gz'):
-      fh=gzip.open(filename)
+      fh=io.TextIOWrapper(gzip.open(filename))
     else:
-      fh=file(filename)
+      fh=io.TextIOWrapper(file(filename))
     try:
       self.version=fh.readline()
       fendian=fh.readline().split(' ')[1].split('-')[0]
