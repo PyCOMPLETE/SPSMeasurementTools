@@ -81,7 +81,7 @@ def make_pickle(start_from_last=True, pickle_name_ecm='ecm_overview.pkl', pickle
         with open(pickle_name_ecm) as fid:
                 ecm_dict = pickle.load(fid)
     except IOError:
-        print("I CREATE (!) the ecm pickle file")
+        print('I CREATE (!) the ecm pickle file')
         ecm_dict = {'1a':{}, '1b':{}, '2a':{}, '2b':{}}
 
 
@@ -278,11 +278,13 @@ def make_mat_files(start_time, end_time='Now', data_folder='/user/slops/data/SPS
 
         t_str_sdds = complete_path.split('.sdds')[0].split('_')[-2] +' '+ complete_path.split('.sdds')[0].split('_')[-1]
         tstamp_filename = time.mktime(time.strptime(t_str_sdds,'%d-%m-%y %H-%M-%S'))
+
         if not(tstamp_filename > start_tstamp_unix and tstamp_filename < end_tstamp_unix):
             continue
 
         if SPSuser != None:
-            user_filename = filename.split('.')[-2]
+            # user_filename = filename.split('.')[-2]
+            user_filename = filename.split('.sdds')[0].split('.')[-1].split('-')[0]
             if user_filename != SPSuser:
                     continue
 
